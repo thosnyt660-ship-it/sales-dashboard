@@ -116,6 +116,7 @@ const $=s=>document.querySelector(s),f0=n=>Math.round(n).toLocaleString('en-US')
 const COL={'محقق':'#6fcf97','متقدم':'#6fcfb8','على المسار':'#f0b46a','متأخر':'#ef7d8a','بدون هدف':'#9aa8c2'};
 let D,SD=null,TD=null,C,S={mgr:'',st:'',q:'',br:new Set(),key:'ach',dir:1},H,last=0;
 const ALIAS={'محمد صفوت':'فرع مول البصريات'},AL=s=>{s=String(s==null?'':s).trim();return ALIAS[s]||s},AR=Object.fromEntries(Object.entries(ALIAS).map(([a,b])=>[b,a]));
+const NUM=v=>{if(typeof v==='number')return isFinite(v)?v:0;const s=String(v==null?'':v).replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[٬,\s\u00a0]/g,'').replace(/[^\d.\-]/g,'');return parseFloat(s)||0};
 function parseS(wb){
  const nm=wb.SheetNames.find(n=>XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1}).slice(0,12).some(x=>x.includes('رقم الفرع')));
  const rows=XLSX.utils.sheet_to_json(wb.Sheets[nm],{header:1,defval:null}).map(r=>r.filter(v=>v!==null&&v!==''));
@@ -135,11 +136,11 @@ function cols(d){const th=D.th||[],y=d.getFullYear(),M=['Jan','Feb','Mar','Apr',
  const a=fi(/^target$/i),b=fi(/^last\s*month$/i),c=fi(/^last\s*year$/i),e=fi(/^avg\s*3\s*months?$/i);
  let tc=a>=0?a:fi(new RegExp('^Target\\s+'+mo+'[a-z]*\\.?\\s+'+y+'$','i'));if(tc<0)tc=th.reduce((q,x,j)=>/^Target\s+[A-Za-z]+\.?\s+\d{4}$/.test(x)?j:q,-1);
  let li=b;if(li<0)li=fi(new RegExp('^(\\d{1,2}-)?'+pm+'[a-z]*\\.?(\\s+\\d{4})?$','i'));if(li<0)li=fi(/^Achi/)-1;
- const yc=ls('yc')?+ls('yc'):(c>=0?c:fi(new RegExp('^'+mo+'[a-z]*\\.?\\s+'+(y-1)+'$','i')));
+ const yc=c>=0?c:(ls('yc')?+ls('yc'):fi(new RegExp('^'+mo+'[a-z]*\\.?\\s+'+(y-1)+'$','i')));
  return{tc,yc,li,qi:e>=0?e:th.indexOf('Q AVG')}}
 function calc(){const d=new Date($('#dt').value+'T00:00'),X=cols(d),yc=X.yc,day=d.getDate(),dim=new Date(d.getFullYear(),d.getMonth()+1,0).getDate(),rem=dim-day,pace=day/dim,mt=$('#mt').value;
- C={day,dim,rem,pace,d,X,rows:D.rows.map(r=>{const s=+(r.o||{})[mt]||0,t=+(r.raw||[])[X.tc]||0,lm=+(r.raw||[])[X.li]||0,qa=+(r.raw||[])[X.qi]||0,ach=t?s/t:0,proj=s/day*dim;
-  return{...r,t,lm,qa,ly:+(r.raw||[])[yc]||0,gy:(+(r.raw||[])[yc]||0)?proj/(+(r.raw||[])[yc])-1:0,s,ach,proj,gl:lm?proj/lm-1:0,gq:qa?proj/qa-1:0,pa:t?proj/t:0,need:rem>0?Math.max(0,t-s)/rem:0,st:!t?'بدون هدف':ach>=1?'محقق':ach>=pace?'متقدم':ach>=pace*.9?'على المسار':'متأخر'}})}}
+ C={day,dim,rem,pace,d,X,rows:D.rows.map(r=>{const s=+(r.o||{})[mt]||0,t=NUM((r.raw||[])[X.tc]),lm=NUM((r.raw||[])[X.li]),qa=NUM((r.raw||[])[X.qi]),ach=t?s/t:0,proj=s/day*dim;
+  return{...r,t,lm,qa,ly:NUM((r.raw||[])[yc]),gy:NUM((r.raw||[])[yc])?proj/NUM((r.raw||[])[yc])-1:0,s,ach,proj,gl:lm?proj/lm-1:0,gq:qa?proj/qa-1:0,pa:t?proj/t:0,need:rem>0?Math.max(0,t-s)/rem:0,st:!t?'بدون هدف':ach>=1?'محقق':ach>=pace?'متقدم':ach>=pace*.9?'على المسار':'متأخر'}})}}
 const gf=v=>(v>=0?'▲ +':'▼ ')+(v*100).toFixed(1)+'%',gc=v=>v>=0?'#6fcf97':'#ef7d8a';
 const agg=rs=>{const Y1=rs.reduce((a,r)=>a+r.ly,0),L1=rs.reduce((a,r)=>a+r.lm,0),Q1=rs.reduce((a,r)=>a+r.qa,0),s=rs.reduce((a,r)=>a+r.s,0),t=rs.reduce((a,r)=>a+r.t,0),p=s/C.day*C.dim;return{s,t,ach:t?s/t:0,proj:p,pa:t?p/t:0,need:C.rem>0?Math.max(0,t-s)/C.rem:0,n:rs.length,lm:L1,qa:Q1,gl:L1?p/L1-1:0,gq:Q1?p/Q1-1:0,ly:Y1,gy:Y1?p/Y1-1:0}};
 const bar=(a,col)=>`<div class="bar" style="--col:${col}"><i style="width:${Math.min(a,1)*100}%"></i><u style="inset-inline-start:${C.pace*100}%"></u></div>`;
@@ -188,8 +189,10 @@ function gauge2(A,rs){const v=A.pa,mx=1.5,f=Math.min(v/mx,1),an=Math.PI*(1-1/mx)
  <path d="M20 125A100 100 0 0 1 220 125" pathLength="100" fill="none" stroke="url(#gg2)" stroke-width="16" stroke-linecap="round" stroke-dasharray="${f*100} 100" style="transition:1s"/>
  <line x1="${x}" y1="${y}" x2="${x2}" y2="${y2}" stroke="#fff" stroke-width="3"/></svg><div class="gv" style="color:${col}">${pc(v)}</div><div class="gl">الخط الأبيض = الهدف (100%) • المقياس حتى 150%</div>`;
  $('#st2').innerHTML=`<span class="chip">المتوقع <b>${f0(A.proj)}</b></span><span class="chip">الهدف <b>${f0(A.t)}</b></span><span class="chip" style="color:${gc(d)}">${d>=0?'فائض متوقع':'عجز متوقع'} <b>${f0(Math.abs(d))}</b></span><span class="chip">فروع متوقع تحقيقها <b>${n}/${wt}</b></span>`}
-function wrn(all){const sm=k=>all.reduce((a,r)=>a+(r[k]||0),0),W=[];if(TD&&!VIEW){if(!sm('t'))W.push('الهدف (Target)');if(!sm('lm'))W.push('الشهر الماضي (Last Month)');if(!sm('ly'))W.push('العام الماضي (Last Year)');if(!sm('qa'))W.push('متوسط 3 شهور (Avg 3 Months)')}
- $('#wr').innerHTML=W.length?`<div class="card" style="border-color:var(--am);margin-bottom:16px;padding:12px 18px">⚠️ لم تُقرأ هذه الأعمدة من ملف الأهداف (قيمتها صفر): <b>${W.join('، ')}</b> — استخدم النموذج الجاهز Targets_Template.xlsx بأسماء الأعمدة المعتمدة.</div>`:''}
+function wrn(all){if(!TD||VIEW){$('#wr').innerHTML='';return}
+ const sm=k=>all.reduce((a,r)=>a+(r[k]||0),0),X=C.X,H=i=>i>=0?D.th[i]:'غير موجود',T=sm('t'),L=[['الهدف',X.tc,'t'],['الشهر الماضي',X.li,'lm'],['العام الماضي',X.yc,'ly'],['متوسط 3 شهور',X.qi,'qa']],W=[];
+ L.forEach(([n,i,k])=>{const v=sm(k);if(!v)W.push(n+' (فارغ أو صفر)');else if(k!=='t'&&T&&v<T*.2)W.push(n+' (إجماليه '+f0(v)+' صغير جداً مقارنة بالهدف '+f0(T)+' — تحقق من الأرقام)')});
+ $('#wr').innerHTML=(W.length?`<div class="card" style="border-color:var(--am);margin-bottom:12px;padding:12px 18px">⚠️ تحقق من ملف الأهداف: <b>${W.join(' • ')}</b></div>`:'')+`<div class="sub" style="margin-bottom:12px">📋 الأعمدة المقروءة من ملف الأهداف: ${L.map(([n,i,k])=>n+' ← <b>'+H(i)+'</b> ('+f0(sm(k))+')').join(' • ')}</div>`}
 function cu(){document.querySelectorAll('.k .v').forEach(e=>{if(!/^[\d,]+$/.test(e.textContent))return;const n=+e.textContent.replace(/,/g,''),t0=performance.now();(function g(t){const p=Math.min((t-t0)/900,1);e.textContent=f0(n*(1-Math.pow(1-p,3)));if(p<1)requestAnimationFrame(g)})(t0)})}
 function cmp(){const M={};C.rows.filter(r=>!S.br.size||S.br.has(r.code)).forEach(r=>(M[r.mgr]=M[r.mgr]||[]).push(r));const E=Object.entries(M).map(([k,v])=>[k,agg(v)]),mx=Math.max(...E.map(e=>Math.max(e[1].proj,e[1].lm,e[1].qa,e[1].ly)),1);
  const b=(l,v,c)=>`<div style="display:grid;grid-template-columns:86px 1fr 78px;gap:8px;align-items:center;font-size:11.5px"><span class="sub">${l}</span><div class="bar" style="--col:${c}"><i style="width:${v/mx*100}%"></i></div><b>${f0(v)}</b></div>`;
